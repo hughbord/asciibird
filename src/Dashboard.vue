@@ -1,6 +1,7 @@
 <template>
   <div id="app">
     <NewAscii />
+    <Settings />
 
     <context-menu :display="showContextMenu" ref="menu">
       <ul>
@@ -35,6 +36,13 @@
           Save Asciibird State
         </li>
         <li @click="startImport('asb')" class="ml-1">Load Asciibird State</li>
+        <li
+          @click="$store.commit('openModal', 'open-settings')"
+          class="ml-1"
+          @contextmenu.prevent
+        >
+        Settings...
+        </li>
       </ul>
     </context-menu>
 
@@ -92,26 +100,34 @@
 </style>
 
 <script>
-import Toolbar from "./components/Toolbar.vue";
-import DebugPanel from "./components/DebugPanel.vue";
-import Editor from "./views/Editor.vue";
+import LZString from 'lz-string';
+import Toolbar from './components/Toolbar.vue';
+import DebugPanel from './components/DebugPanel.vue';
+import Editor from './views/Editor.vue';
 
-import CharPicker from "./components/parts/CharPicker.vue";
-import ColourPicker from "./components/parts/ColourPicker.vue";
-import ContextMenu from "./components/parts/ContextMenu.vue";
+import CharPicker from './components/parts/CharPicker.vue';
+import ColourPicker from './components/parts/ColourPicker.vue';
+import ContextMenu from './components/parts/ContextMenu.vue';
 
-import NewAscii from "./components/modals/NewAscii.vue";
-import LZString from "lz-string";
+import NewAscii from './components/modals/NewAscii.vue';
+import Settings from './components/modals/Settings.vue';
 
 export default {
+
+  // load settings?
+  beforeCreate() {
+    // change the font
+    document.body.style.fontFamily = this.$store.getters.getOptions.font;
+  },
+
   async created() {
     // Load from irc watch if present in the URL bar
-    const asciiUrlCdn = new URL(location.href).searchParams.get("ascii");
+    const asciiUrlCdn = new URL(location.href).searchParams.get('ascii');
     if (asciiUrlCdn) {
       const res = await fetch(`https://ascii.jewbird.live/${asciiUrlCdn}`, {
-        method: "GET",
+        method: 'GET',
         headers: {
-          Accept: "text/plain",
+          Accept: 'text/plain',
         },
       });
 
@@ -121,12 +137,12 @@ export default {
       // window.location.href = "/";
     }
 
-    const asciiUrl = new URL(location.href).searchParams.get("ircwatch");
+    const asciiUrl = new URL(location.href).searchParams.get('ircwatch');
     if (asciiUrl) {
       const res = await fetch(`https://irc.watch/ascii/txt/${asciiUrl}`, {
-        method: "GET",
+        method: 'GET',
         headers: {
-          Accept: "text/plain",
+          Accept: 'text/plain',
         },
       });
 
@@ -144,10 +160,12 @@ export default {
     ColourPicker,
     ContextMenu,
     NewAscii,
+    Settings,
   },
-  name: "Dashboard",
+  name: 'Dashboard',
   data: () => ({
     showNewAsciiModal: false,
+    showSettingsModal: false,
     currentTab: 1,
     canvasX: null,
     canvasY: null,
@@ -166,8 +184,8 @@ export default {
     },
     icon() {
       return [
-        this.currentTool.fa ?? "fas",
-        this.currentTool.icon ?? "mouse-pointer",
+        this.currentTool.fa ?? 'fas',
+        this.currentTool.icon ?? 'mouse-pointer',
       ];
     },
   },
@@ -186,13 +204,13 @@ export default {
       const fileReader = new FileReader();
 
       const _importType = this.importType;
-      fileReader.addEventListener("load", () => {
+      fileReader.addEventListener('load', () => {
         switch (_importType) {
-          case "asb":
+          case 'asb':
             this.importAsciibirdState(fileReader.result, filename);
             break;
 
-          case "mirc":
+          case 'mirc':
             this.mircAsciiImport(fileReader.result, filename);
             break;
         }
@@ -306,21 +324,23 @@ export default {
 
       // set asciiImport as the entire file contents as a string
       const asciiImport = contents
-        .split("\u0003\u0003")
-        .join("\u0003")
-        .split("\u000F").join("")
-        .split("\u0003\n").join("\n")
-        .split("\u0002\u0003").join("\u0003");
+        .split('\u0003\u0003')
+        .join('\u0003')
+        .split('\u000F').join('')
+        .split('\u0003\n')
+        .join('\n')
+        .split('\u0002\u0003')
+        .join('\u0003');
 
       // This will end up in the asciibirdMeta
       const finalAscii = {
         width: false, // defined in: switch (curChar) case "\n":
-        height: asciiImport.split("\n").length,
+        height: asciiImport.split('\n').length,
         title: filename,
         key: this.$store.getters.nextTabValue,
         blockWidth: 8 * this.$store.getters.blockSizeMultiplier,
         blockHeight: 13 * this.$store.getters.blockSizeMultiplier,
-        blocks: this.create2DArray(asciiImport.split("\n").length),
+        blocks: this.create2DArray(asciiImport.split('\n').length),
         history: [],
         redo: [],
         x: 8 * 35, // the dragable ascii canvas x
@@ -328,8 +348,8 @@ export default {
       };
 
       // Turn the entire ascii string into an array
-      let asciiStringArray = asciiImport.split("");
-      let linesArray = asciiImport.split("\n");
+      let asciiStringArray = asciiImport.split('');
+      const linesArray = asciiImport.split('\n');
 
       // The proper X and Y value of the block inside the ASCII
       let asciiX = 0;
@@ -350,7 +370,7 @@ export default {
       // Used before the loop, better for plain text
       let maxWidthFound = 0;
 
-      for(let i = 0; i < linesArray.length; i++) {
+      for (let i = 0; i < linesArray.length; i++) {
         if (linesArray[i].length > maxWidthFound) {
           maxWidthFound = linesArray[i].length;
         }
@@ -362,9 +382,9 @@ export default {
         // Defining a small finite state machine
         // to detect the colour code
         switch (curChar) {
-          case "\n":
+          case '\n':
             // Reset the colours here on a new line
-            curBlock = { 
+            curBlock = {
               fg: null,
               bg: null,
               char: null,
@@ -379,15 +399,12 @@ export default {
 
             // Calculate widths mirc asciis vs plain text
             if (!finalAscii.width && widthOfColCodes > 0) {
-              finalAscii.width =
-                maxWidthLoop - widthOfColCodes; // minus \n for the proper width
-            } 
-            
-            
+              finalAscii.width = maxWidthLoop - widthOfColCodes; // minus \n for the proper width
+            }
+
             if (!finalAscii.width && widthOfColCodes === 0) {
               // Plain text
-              finalAscii.width =
-                maxWidthFound; // minus \n for the proper width
+              finalAscii.width = maxWidthFound; // minus \n for the proper width
             }
 
             // Resets the X value
@@ -397,7 +414,7 @@ export default {
             widthOfColCodes = 0;
             break;
 
-          case "\u0003":
+          case '\u0003':
             // Remove the colour char
             asciiStringArray.shift();
             widthOfColCodes++;
@@ -422,12 +439,12 @@ export default {
 
               asciiStringArray = asciiStringArray.slice(
                 parsedColour.toString().length,
-                asciiStringArray.length
+                asciiStringArray.length,
               );
             }
 
             // No background colour
-            if (asciiStringArray[0] !== ",") {
+            if (asciiStringArray[0] !== ',') {
               break;
             } else {
               // Remove , from array
@@ -441,11 +458,11 @@ export default {
             parsedColour = parseInt(`${colourChar1}${colourChar2}`);
 
             if (
-              !isNaN(colourChar1) &&
-              !isNaN(colourChar2) &&
-              parseInt(colourChar2) > parseInt(colourChar1) &&
-              !isNaN(parsedColour) &&
-              parseInt(parsedColour) < 10
+              !isNaN(colourChar1)
+              && !isNaN(colourChar2)
+              && parseInt(colourChar2) > parseInt(colourChar1)
+              && !isNaN(parsedColour)
+              && parseInt(parsedColour) < 10
             ) {
               parsedColour = parseInt(colourChar2);
               widthOfColCodes += 1;
@@ -453,8 +470,8 @@ export default {
             }
 
             if (
-              parseInt(colourChar2) === parseInt(colourChar1) &&
-              parseInt(parsedColour) < 10
+              parseInt(colourChar2) === parseInt(colourChar1)
+              && parseInt(parsedColour) < 10
             ) {
               parsedColour = parseInt(colourChar1);
               asciiStringArray.shift();
@@ -476,7 +493,7 @@ export default {
 
               asciiStringArray = asciiStringArray.slice(
                 parsedColour.toString().length,
-                asciiStringArray.length
+                asciiStringArray.length,
               );
 
               break;
@@ -496,10 +513,10 @@ export default {
 
       // Store the ASCII
       finalAscii.blocks = LZString.compressToUTF16(
-        JSON.stringify(finalAscii.blocks)
+        JSON.stringify(finalAscii.blocks),
       );
       finalAscii.history.push(finalAscii.blocks);
-      this.$store.commit("newAsciibirdMeta", finalAscii);
+      this.$store.commit('newAsciibirdMeta', finalAscii);
 
       // To show the ASCII after importing we get the last key
       // from the asciiBirdMeta array
@@ -509,23 +526,23 @@ export default {
 
       // Set the current tab and pop the array for the last value
       this.currentTab = keys.pop();
-      this.$store.commit("changeTab", this.currentTab);
+      this.$store.commit('changeTab', this.currentTab);
 
       // Update the browsers title to the ASCII filename
       document.title = `asciibird - ${this.$store.getters.currentAscii.title}`;
     },
     importAsciibirdState(fileContents) {
-      let contents = JSON.parse(
-        LZString.decompressFromEncodedURIComponent(fileContents)
+      const contents = JSON.parse(
+        LZString.decompressFromEncodedURIComponent(fileContents),
       );
-      this.$store.commit("changeState", { ...contents });
+      this.$store.commit('changeState', { ...contents });
     },
     exportAsciibirdState() {
       let output;
 
       try {
         output = LZString.compressToEncodedURIComponent(
-          JSON.stringify(this.$store.getters.getState)
+          JSON.stringify(this.$store.getters.getState),
         );
 
         // Default timestamp for filename
@@ -540,7 +557,7 @@ export default {
         this.downloadToFile(
           output,
           `asciibird-${y}-${m}-${d}-${h}-${mi}-${s}.asb`,
-          "application/gzip"
+          'application/gzip',
         );
       } catch (err) {
         console.log(err);
@@ -548,19 +565,17 @@ export default {
     },
     exportMirc(type) {
       const { currentAscii } = this.$store.getters;
-      let blocks = this.$store.getters.currentAsciiBlocks;
+      const blocks = this.$store.getters.currentAsciiBlocks;
       const output = [];
       let curBlock = null;
       let prevBlock = { bg: -1, fg: -1 };
-      
+
       for (let y = 0; y <= blocks.length - 1; y++) {
-        
         if (y >= currentAscii.height) {
           continue;
         }
 
         for (let x = 0; x <= blocks[y].length - 1; x++) {
-
           if (x >= currentAscii.width) {
             continue;
           }
@@ -571,20 +586,20 @@ export default {
           // we'll put a colour codes and continue as normal
           if (curBlock.bg !== prevBlock.bg || curBlock.fg !== prevBlock.fg) {
             Object.assign(curBlock, blocks[y][x]);
-            const zeroPad = (num, places) => String(num).padStart(places, "0");
+            const zeroPad = (num, places) => String(num).padStart(places, '0');
             output.push(
               `\u0003${zeroPad(
                 curBlock.fg ?? this.$store.getters.getOptions.defaultFg,
-                2
+                2,
               )},${zeroPad(
                 curBlock.bg ?? this.$store.getters.getOptions.defaultBg,
-                2
-              )}`
+                2,
+              )}`,
             );
           }
 
           // null .chars will end up as space
-          output.push(curBlock.char ?? " ");
+          output.push(curBlock.char ?? ' ');
           prevBlock = blocks[y][x];
         }
 
@@ -594,40 +609,39 @@ export default {
 
         // New line except for the very last line
         if (y < blocks.length - 1) {
-          output.push("\n");
+          output.push('\n');
         }
       }
 
       // Download to a txt file
       // Check if txt already exists and append it
-      const filename =
-        currentAscii.title.slice(currentAscii.title.length - 3) === "txt"
-          ? currentAscii.title
-          : `${currentAscii.title}.txt`;
+      const filename = currentAscii.title.slice(currentAscii.title.length - 3) === 'txt'
+        ? currentAscii.title
+        : `${currentAscii.title}.txt`;
 
       switch (type) {
-        case "clipboard":
-          this.$copyText(output.join("")).then(
-            function (e) {
-              alert("Copied");
+        case 'clipboard':
+          this.$copyText(output.join('')).then(
+            (e) => {
+              alert('Copied');
               console.log(e);
             },
-            function (e) {
-              alert("Can not copy");
+            (e) => {
+              alert('Can not copy');
               console.log(e);
-            }
+            },
           );
           break;
 
         default:
-        case "file":
-          this.downloadToFile(output.join(""), filename, "text/plain");
+        case 'file':
+          this.downloadToFile(output.join(''), filename, 'text/plain');
           break;
       }
     },
     downloadToFile(content, filename, contentType) {
       const downloadToFile = (content, filename, contentType) => {
-        const a = document.createElement("a");
+        const a = document.createElement('a');
         const file = new Blob([content], { type: contentType });
 
         a.href = URL.createObjectURL(file);
@@ -642,11 +656,11 @@ export default {
     changeTab(key, value) {
       // Update the tab index in vuex store
       this.currentTab = key;
-      this.$store.commit("changeTab", key);
+      this.$store.commit('changeTab', key);
     },
     clearCache() {
       localStorage.clear();
-      window.location.href = "/";
+      window.location.href = '/';
     },
 
     create2DArray(rows) {
